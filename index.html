@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transient Reminiscence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Pengaturan Dasar */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Noto Sans', sans-serif;
+            background-color: #000;
+            color: white;
+        }
+
+        /* Kontainer Utama Presentasi */
+        #presentation {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Pengaturan untuk setiap Slide */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* [EDIT] Mengubah background-size ke contain dan menambahkan no-repeat */
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+
+        /* Slide yang sedang aktif */
+        .slide.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Layar Pemuatan, Prompt Mulai, dan Peringatan Orientasi */
+        .fullscreen-overlay {
+            position: absolute;
+            z-index: 100;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #start-prompt {
+            display: none; /* Sembunyikan awalnya, tampilkan setelah loading selesai */
+        }
+        
+        #start-prompt p {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        #start-button {
+            padding: 1rem 2rem;
+            font-size: 1.5rem;
+            background-color: #3a3a3a;
+            border: 2px solid white;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #start-button:hover {
+            background-color: #5a5a5a;
+        }
+
+        /* Spinner untuk Loading */
+        #loading-screen p {
+            font-size: 1.5rem;
+            margin-top: 20px;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Peringatan Orientasi */
+        #orientation-warning {
+            display: none; /* Sembunyi di mode lanskap */
+            z-index: 200; /* Paling atas */
+        }
+        #orientation-warning svg {
+            width: 64px;
+            height: 64px;
+            fill: white;
+            margin-bottom: 1rem;
+        }
+        #orientation-warning p {
+            font-size: 1.2rem;
+            max-width: 300px;
+        }
+        @media (orientation: portrait) {
+            #orientation-warning {
+                display: flex;
+            }
+        }
+
+        /* Tombol Toggle Audio */
+        #audio-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0; /* Sembunyikan awalnya */
+            transition: opacity 0.5s;
+        }
+        #audio-toggle.visible {
+            opacity: 1;
+        }
+        #audio-toggle svg {
+            fill: white;
+            width: 24px;
+            height: 24px;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Peringatan untuk mengubah orientasi ke lanskap -->
+    <div id="orientation-warning" class="fullscreen-overlay">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16.48,2.52,14.36,4.64,12.24,2.52,10.12,4.64,8,2.52,5.88,4.64,3.76,2.52,1.64,4.64V19.5H22.5V4.5ZM7,18.25a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,7,18.25Zm10.5,0a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,17.5,18.25Zm0-4a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,17.5,14.25Zm-3.5,0a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,14,14.25Zm-3.5,0a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,10.5,14.25Zm-3.5,0A1.25,1.25,0,1,1,8.25,13,1.25,1.25,0,0,1,7,14.25Zm10.5-4a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,17.5,10.25Zm-3.5,0a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,14,10.25Zm-3.5,0a1.25,1.25,0,1,1,1.25-1.25A1.25,1.25,0,0,1,10.5,10.25Zm-3.5,0A1.25,1.25,0,1,1,8.25,9,1.25,1.25,0,0,1,7,10.25Z"/></svg>
+        <p>Gunakan orientasi landscape agar dapat berjalan</p>
+    </div>
+
+    <!-- Layar Pemuatan -->
+    <div id="loading-screen" class="fullscreen-overlay">
+        <div class="spinner"></div>
+        <p>Memuat Aset...</p>
+    </div>
+
+    <!-- Prompt untuk memulai presentasi -->
+    <div id="start-prompt" class="fullscreen-overlay">
+        <button id="start-button">Mulai</button>
+    </div>
+
+    <!-- Audio Player (disembunyikan) -->
+    <audio id="background-music" loop>
+        <source src="audio/audio.mp3" type="audio/mpeg">
+        Browser Anda tidak mendukung elemen audio.
+    </audio>
+
+    <!-- Tombol Toggle Audio -->
+    <div id="audio-toggle">
+        <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+        <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="display:none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"></path></svg>
+    </div>
+
+    <div id="presentation">
+        <div class="slide" data-bg="img/Slide1.png"></div>
+        <div class="slide" data-bg="img/Slide2.png"></div>
+        <div class="slide" data-bg="img/Slide3.png"></div>
+        <div class="slide" data-bg="img/Slide4.png"></div>
+        <div class="slide" data-bg="img/Slide5.png"></div>
+        <div class="slide" data-bg="img/Slide6.png"></div>
+    </div>
+
+    <script>
+        const presentation = document.getElementById('presentation');
+        const slides = document.querySelectorAll('.slide');
+        const music = document.getElementById('background-music');
+        const loadingScreen = document.getElementById('loading-screen');
+        const startPrompt = document.getElementById('start-prompt');
+        const startButton = document.getElementById('start-button');
+        const audioToggle = document.getElementById('audio-toggle');
+        const iconUnmuted = document.getElementById('icon-unmuted');
+        const iconMuted = document.getElementById('icon-muted');
+        
+        let currentSlideIndex = 0;
+
+        // [FIX] Fungsi preload gambar yang lebih tangguh
+        function preloadImages(urls) {
+            const promises = urls.map(url => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.src = url;
+                    // Selalu resolve, tapi kirim statusnya
+                    img.onload = () => resolve({ url, status: 'ok' });
+                    img.onerror = () => resolve({ url, status: 'error' }); // Resolve juga saat error
+                });
+            });
+            return Promise.all(promises); // Gunakan Promise.all karena kita selalu resolve
+        }
+
+        // Jalankan ini saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            const imageUrls = Array.from(slides).map(slide => slide.getAttribute('data-bg'));
+            
+            preloadImages(imageUrls)
+                .then((results) => {
+                    const failedImages = results.filter(result => result.status === 'error');
+                    if (failedImages.length > 0) {
+                        console.warn('Peringatan: Beberapa gambar gagal dimuat. Presentasi akan tetap berjalan.');
+                        failedImages.forEach(img => console.error(`- Gagal memuat: ${img.url}`));
+                    } else {
+                        console.log('Semua gambar berhasil dimuat.');
+                    }
+                    
+                    // Lanjutkan ke prompt mulai tidak peduli hasilnya
+                    loadingScreen.style.display = 'none';
+                    startPrompt.style.display = 'flex';
+                });
+        });
+
+        function startPresentation() {
+            startPrompt.style.display = 'none';
+            music.play().catch(error => console.log("Autoplay musik diblokir oleh browser."));
+            
+            audioToggle.classList.add('visible');
+
+            slides.forEach(slide => {
+                const bgUrl = slide.getAttribute('data-bg');
+                if (bgUrl) {
+                    slide.style.backgroundImage = `url('${bgUrl}')`;
+                }
+            });
+
+            showSlide(0);
+        }
+
+        function showSlide(index) {
+            if (slides[currentSlideIndex]) {
+                slides[currentSlideIndex].classList.remove('active');
+            }
+            currentSlideIndex = index;
+            if (slides[currentSlideIndex]) {
+                slides[currentSlideIndex].classList.add('active');
+            }
+        }
+
+        function advance() {
+            const nextSlideIndex = (currentSlideIndex + 1) % slides.length;
+            showSlide(nextSlideIndex);
+        }
+
+        function toggleAudio() {
+            music.muted = !music.muted;
+            if (music.muted) {
+                iconUnmuted.style.display = 'none';
+                iconMuted.style.display = 'block';
+            } else {
+                iconUnmuted.style.display = 'block';
+                iconMuted.style.display = 'none';
+            }
+        }
+
+        startButton.addEventListener('click', startPresentation);
+        presentation.addEventListener('click', () => {
+            if (startPrompt.style.display === 'none') {
+                advance();
+            }
+        });
+        audioToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            toggleAudio();
+        });
+
+    </script>
+
+</body>
+</html>
